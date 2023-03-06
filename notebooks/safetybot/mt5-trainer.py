@@ -50,7 +50,8 @@ CONFIG = {"special_tokens":SPECIAL_TOKENS,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
 "train_dataset":{
-    "allenai/prosocial-dialog":["train","validation"]
+    "allenai/prosocial-dialog":["train","validation"],
+    "shahules786/prosocial_augmented":"train",
 },
 "test_dataset":{"allenai/prosocial-dialog":"test"}
 }
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         os.mkdir(ROOT_DIR)
     
     with open(os.path.join(ROOT_DIR,"config.json"),"w") as file:
-        json.dump(CONFIG,file)
+        json.dump(CONFIG,file,indent=4)
     
 
     model = T5ForConditionalGeneration.from_pretrained(CONFIG["model"])
