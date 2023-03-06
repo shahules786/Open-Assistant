@@ -42,11 +42,11 @@ wandb.login(key=wandb_key)
 
 
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
-"model":"google/mt5-base",
+"model":"t5-base",
 "max_len":256,
 "epochs":1,
-"batch_size":8,
-"fp16":False,
+"batch_size":4,
+"fp16":True,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
 "train_dataset":{
