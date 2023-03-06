@@ -171,7 +171,7 @@ if __name__ == "__main__":
         os.mkdir(ROOT_DIR)
     
     with open(os.path.join(ROOT_DIR,"config.json"),"w") as file:
-        json.dump(json.dumps(CONFIG),file)
+        json.dump(CONFIG,file)
     
 
     model = T5ForConditionalGeneration.from_pretrained(CONFIG["model"])
@@ -212,5 +212,5 @@ if __name__ == "__main__":
     #trainer.push_to_hub("t5-end2end-questions-generation")
 
     wandb.finish()
-    #trainer.save_model(os.path.join(ROOT_DIR,"safety-model"))
+    trainer.save_model(os.path.join(ROOT_DIR,"safety-model"))
     tokenizer.save_vocabulary(os.path.join(ROOT_DIR,"safety-tokenizer"))
