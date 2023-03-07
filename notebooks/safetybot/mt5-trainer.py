@@ -1,7 +1,7 @@
 import torch
 from transformers import (
-    T5ForConditionalGeneration, 
-    T5Tokenizer, 
+    MT5ForConditionalGeneration, 
+    MT5Tokenizer, 
     EvalPrediction,
     DataCollator,
     Trainer,
@@ -174,8 +174,8 @@ if __name__ == "__main__":
         json.dump(CONFIG,file,indent=4)
     
 
-    model = T5ForConditionalGeneration.from_pretrained(CONFIG["model"])
-    tokenizer = T5Tokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
+    model = MT5ForConditionalGeneration.from_pretrained(CONFIG["model"])
+    tokenizer = MT5Tokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
     add_special_tokens(tokenizer,model)
     
     train_dataset = prepare_dataset(tokenizer,"train_dataset")
@@ -213,4 +213,4 @@ if __name__ == "__main__":
 
     wandb.finish()
     trainer.save_model(os.path.join(ROOT_DIR,"safety-model"))
-    tokenizer.save_vocabulary(os.path.join(ROOT_DIR,"safety-tokenizer"))
+    tokenizer.save_pretrained(os.path.join(ROOT_DIR,"safety-tokenizer"))
