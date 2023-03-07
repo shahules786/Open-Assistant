@@ -1,7 +1,7 @@
 import torch
 from transformers import (
     MT5ForConditionalGeneration, 
-    MT5Tokenizer, 
+    AutoTokenizer, 
     EvalPrediction,
     DataCollator,
     Trainer,
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     
 
     model = MT5ForConditionalGeneration.from_pretrained(CONFIG["model"])
-    tokenizer = MT5Tokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
+    tokenizer = AutoTokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
     add_special_tokens(tokenizer,model)
     
     train_dataset = prepare_dataset(tokenizer,"train_dataset")
@@ -208,9 +208,12 @@ if __name__ == "__main__":
     # Training
     trainer.train()
 
-    # When training is done, we push the fine-tuned model to the Hub
-    #trainer.push_to_hub("t5-end2end-questions-generation")
+    try:
+        # When training is done, we push the fine-tuned model to the Hub
+        trainer.push_to_hub("shahules786/Safetybot-mt5-base")
+        tokenizer.push_to_hub("shahules786/Safetybot-mt5-base")
+    except Exception as e:
+        print("Failed to push to HUB")
 
     wandb.finish()
     trainer.save_model(os.path.join(ROOT_DIR,"safety-model"))
-    tokenizer.save_pretrained(os.path.join(ROOT_DIR,"safety-tokenizer"))
