@@ -42,7 +42,7 @@ wandb.login(key=wandb_key)
 
 
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
-"model":"t5-base",
+"model":"google/mt5-base",
 "max_len":256,
 "epochs":1,
 "batch_size":4,
