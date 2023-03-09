@@ -44,14 +44,14 @@ wandb.login(key=wandb_key)
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
 "model":"google/mt5-base",
 "max_len":256,
+"gradient_accumulation_steps":32
 "epochs":1,
-"batch_size":4,
-"fp16":True,
+"batch_size":8,
+"fp16":False,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
 "train_dataset":{
     "allenai/prosocial-dialog":["train","validation"],
-    "shahules786/prosocial_augmented":["train"],
 
 },
 "test_dataset":{"allenai/prosocial-dialog":"test"}
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     training_args = TrainingArguments(output_dir=ROOT_DIR, 
                                   per_device_train_batch_size=CONFIG["batch_size"], 
                                   per_device_eval_batch_size=CONFIG["batch_size"],
-#                                   gradient_accumulation_steps=16,
+                                  gradient_accumulation_steps=CONFIG["gradient_accumulation_steps"],
                                   num_train_epochs=CONFIG["epochs"],
                                   logging_steps=100,
                                   evaluation_strategy="steps",
