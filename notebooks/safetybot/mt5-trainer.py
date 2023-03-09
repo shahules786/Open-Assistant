@@ -44,7 +44,7 @@ wandb.login(key=wandb_key)
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
 "model":"google/mt5-base",
 "max_len":256,
-"gradient_accumulation_steps":4,
+"gradient_accumulation_steps":2,
 "epochs":1,
 "batch_size":4,
 "fp16":False,
