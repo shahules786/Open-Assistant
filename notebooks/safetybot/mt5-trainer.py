@@ -1,11 +1,13 @@
 import torch
 from transformers import (
     MT5ForConditionalGeneration, 
+    T5ForConditionalGeneration, 
     AutoTokenizer, 
     EvalPrediction,
     DataCollator,
     Trainer,
-    TrainingArguments)
+    TrainingArguments,
+    get_scheduler)
 from datasets import load_dataset,concatenate_datasets
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from dataclasses import dataclass, field
@@ -14,8 +16,9 @@ import json
 import wandb
 import os
 from transformers import ConversationalPipeline
+from torch.optim import AdamW
 
-jobid = os.environ.get("SLURM_JOB_ID")
+jobid = os.environ.get("SLURM_JOB_ID","123")
 ROOT_DIR = os.path.join("/scratch/c.scmse/safety",jobid)
 
 # LABEL2ID = {
@@ -44,17 +47,20 @@ wandb.login(key=wandb_key)
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
 "model":"google/mt5-base",
 "max_len":256,
-"gradient_accumulation_steps":4,
-"epochs":1,
-"batch_size":4,
-"fp16":True,
+"gradient_accumulation_steps":8,
+"epochs":2,
+"batch_size":2,
+"fp16":False,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
 "train_dataset":{
     "allenai/prosocial-dialog":["train","validation"],
 
 },
-"test_dataset":{"allenai/prosocial-dialog":"test"}
+"test_dataset":{"allenai/prosocial-dialog":"test"},
+"learning_rate":1e-4,
+"scheduler":"cosine",
+"warmup":0.1,
 }
 
 def add_special_tokens(tokenizer,model):
@@ -166,6 +172,27 @@ def prepare_dataset(tokenizer,col):
     
     return ConcatDataset(all_datasets)
 
+def configure_optimizers(model,total_steps):
+
+    no_decay = ["bias", "LayerNorm.weight"]
+    optimizer_grouped_parameters = [
+            {
+                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+                "weight_decay": CONFIG.get("weight_decay",0.0),
+            },
+            {
+                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+            },
+    ]
+    optimizer = AdamW(optimizer_grouped_parameters, lr=CONFIG["learning_rate"],)
+    scheduler = get_scheduler(CONFIG["scheduler"],optimizer,
+                num_warmup_steps=int(CONFIG["warmup"]*total_steps),
+                num_training_steps=total_steps
+                )
+    
+    return optimizer,scheduler
+
 
 if __name__ == "__main__":
 
@@ -183,6 +210,10 @@ if __name__ == "__main__":
     train_dataset = prepare_dataset(tokenizer,"train_dataset")
     valid_dataset = prepare_dataset(tokenizer,"test_dataset")
 
+    total_steps = len(train_dataset) * CONFIG["epochs"]/(CONFIG["batch_size"]*CONFIG["gradient_accumulation_steps"])
+    print("Total Number of train steps:",total_steps)
+    optimizer,scheduler = configure_optimizers(model,total_steps)
+
     training_args = TrainingArguments(output_dir=ROOT_DIR, 
                                   per_device_train_batch_size=CONFIG["batch_size"], 
                                   per_device_eval_batch_size=CONFIG["batch_size"],
@@ -191,7 +222,7 @@ if __name__ == "__main__":
                                   logging_steps=100,
                                   evaluation_strategy="steps",
                                   eval_steps=1000,
-                                  save_steps=5000,
+                                  save_steps=3000,
                                   report_to="wandb",
                                   push_to_hub=False,
                                   fp16=CONFIG["fp16"],
@@ -204,18 +235,12 @@ if __name__ == "__main__":
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=valid_dataset,
-        data_collator=T2TDataCollator()
+        data_collator=T2TDataCollator(),
+        optimizers = [optimizer,scheduler]
     )
 
     # Training
     trainer.train()
-
-    try:
-        # When training is done, we push the fine-tuned model to the Hub
-        trainer.push_to_hub("shahules786/Safetybot-mt5-base")
-        tokenizer.push_to_hub("shahules786/Safetybot-mt5-base")
-    except Exception as e:
-        print("Failed to push to HUB")
 
     wandb.finish()
     trainer.save_model(os.path.join(ROOT_DIR,"safety-model"))
