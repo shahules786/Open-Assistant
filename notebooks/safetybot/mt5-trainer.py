@@ -45,11 +45,11 @@ wandb.login(key=wandb_key)
 
 
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
-"model":"t5-base",
+"model":"google/mt5-base",
 "max_len":256,
-"gradient_accumulation_steps":4,
-"epochs":1,
-"batch_size":8,
+"gradient_accumulation_steps":8,
+"epochs":2,
+"batch_size":2,
 "fp16":False,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
@@ -257,7 +257,7 @@ if __name__ == "__main__":
         json.dump(CONFIG,file,indent=4)
     
 
-    model = T5ForConditionalGeneration.from_pretrained(CONFIG["model"])
+    model = MT5ForConditionalGeneration.from_pretrained(CONFIG["model"])
     tokenizer = AutoTokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
     add_special_tokens(tokenizer,model)
     
