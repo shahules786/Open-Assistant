@@ -45,16 +45,17 @@ wandb.login(key=wandb_key)
 
 
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
-"model":"google/mt5-base",
+"model":"t5-base",
 "max_len":256,
-"gradient_accumulation_steps":8,
-"epochs":2,
-"batch_size":2,
+"gradient_accumulation_steps":4,
+"epochs":1,
+"batch_size":8,
 "fp16":False,
 "train_dataset":"allenai/prosocial-dialog",
 "Notes":"MT5 using prosocial",
 "train_dataset":{
     "allenai/prosocial-dialog":["train","validation"],
+    "shahules786/prosocial-confessions":"train",
 
 },
 "test_dataset":{"allenai/prosocial-dialog":"test"},
@@ -156,9 +157,16 @@ class T2TDataCollator():
         'decoder_attention_mask': decoder_attention_mask
     }
 
+def filter_dataset(dataset,split):
+    from datasets import Dataset
+    if "confidence" in dataset.column_names[split]:
+        dataset = anthropic_aug_with_prosocial_label(dataset,split)
+        dataset = Dataset.from_list(dataset,split=split)
+        dataset = dataset.filter(lambda example : example["safety_label"]!="__needs_intervention__" and example["confidence"]>0.5)
+        dataset = dataset.train_test_split(test_size=0.0001)
+    return dataset
 
 def prepare_dataset(tokenizer,col):
-
     all_datasets=[]
     if isinstance(CONFIG[col],dict):
         for key,value in CONFIG[col].items():
@@ -167,6 +175,7 @@ def prepare_dataset(tokenizer,col):
                 dataset = dataset.rename_columns({"Human":"context","Assistant":"response"})
             except Exception as e:
                 print(e)
+            dataset = filter_dataset(dataset,"train")
             train_dataset = SafetyDataset(dataset,split=value,tokenizer=tokenizer,max_len=CONFIG["max_len"])
             all_datasets.append(train_dataset)
     
@@ -194,6 +203,51 @@ def configure_optimizers(model,total_steps):
     return optimizer,scheduler
 
 
+def anthropic_aug_with_prosocial_label(dataset,split):
+
+  new_data = []
+  episodes = {}
+  prev_task=""
+  for  idx, d in enumerate(dataset[split]):
+    prev_task = ",".join(d['rots']).lower()
+    safety_label = d['safety_label']
+
+    if safety_label ==   "__casual__":
+        safety_label = "__casual__"
+    else:
+      if 'jewish' in prev_task or  'n word' in prev_task or "racial" in prev_task or "nazi" in prev_task or "holocust" in prev_task or "mexican" in prev_task or "hispanic" in prev_task or " jews " in prev_task or " jew " in prev_task or " black people " in prev_task or " asian people " in  prev_task or "nigger" in prev_task:
+        safety_label = safety_label
+        #print (safety_label, d)
+      elif "self harm" in prev_task:
+        safety_label = safety_label.replace("possibly_", "").replace("probably_", "")
+        #print (safety_label, d)
+      elif "date underage" in prev_task:
+        if "joke" not in prev_task:
+          safety_label =  "__needs__intervention__"
+          #print (prev_task, d)   
+      elif "damage" in prev_task or "robbing" in prev_task or " rob " in prev_task or "hide drug" in prev_task or "run from the cops" in prev_task or "blackmail" in prev_task or "violen" in prev_task or "steroids" in prev_task or "spike" in prev_task or "bomb" in prev_task or "hit someone" in prev_task or " kill" in prev_task or "cannibal" in prev_task or "take steroids" in prev_task or "drive drunk" in prev_task or "theft" in prev_task or "property" in prev_task or "hiding drugs" in prev_task or "frame someone" in prev_task or "drive after a few drink" in prev_task or "take something" in prev_task or "get high" in prev_task or "shoplift" in prev_task or "abusing" in prev_task or "abuse" in prev_task or " rape" in prev_task or " kill" in prev_task or "taking" in prev_task or "stalk" in prev_task or "steal" in prev_task or "hurt" in prev_task or "illegal" in prev_task or "hide money" in prev_task or "property damage" in prev_task or "someone's drink" in prev_task:
+        if "joke" not in prev_task:
+          safety_label = safety_label.replace("possibly_", "").replace("probably_", "")
+      elif "dangerous" not in prev_task and safety_label == "__needs__intervention__" and d['confidence'] < .6:
+        safety_label =  "__needs_caution__"
+      elif safety_label ==  "__needs_caution__":
+        if d['confidence'] < .6:
+          safety_label = "__probably_needs_caution__"
+          #print ('swap', safety_label, prev_task)
+      elif safety_label == "__probably_needs_caution__":
+        if d['confidence'] < .6:
+          safety_label = "__probably_needs_caution__"
+          #print ('swap', safety_label, prev_task)
+      elif "possibly" in safety_label:
+        if d['confidence'] < .6:
+          safety_label =  "__casual__"
+      #episodes[prev_task] = episodes.get(prev_task, []) + [f"Input: {d['Human']}\nOutput: {safety_label}"]
+    
+    d["safety_label"] = safety_label
+    new_data.append(d)
+  return new_data
+
+
 if __name__ == "__main__":
 
     if not os.path.exists(ROOT_DIR):
@@ -203,7 +257,7 @@ if __name__ == "__main__":
         json.dump(CONFIG,file,indent=4)
     
 
-    model = MT5ForConditionalGeneration.from_pretrained(CONFIG["model"])
+    model = T5ForConditionalGeneration.from_pretrained(CONFIG["model"])
     tokenizer = AutoTokenizer.from_pretrained(CONFIG["model"],padding_side="right",truncation_side="right",model_max_length=512)
     add_special_tokens(tokenizer,model)
     
