@@ -45,7 +45,7 @@ wandb.login(key=wandb_key)
 
 
 CONFIG = {"special_tokens":SPECIAL_TOKENS,
-"model":"t5-base",
+"model":"google/mt5-base",
 "max_len":256,
 "gradient_accumulation_steps":8,
 "epochs":2,
@@ -281,7 +281,7 @@ if __name__ == "__main__":
                                   report_to="wandb",
                                   push_to_hub=False,
                                   fp16=CONFIG["fp16"],
-                                  run_name=f"safety-bot-sample-hawk-{jobid}",)
+                                  run_name=f"safety-bot-sample-hawk-{CONFIG["model"].split('/')[-1]}-{jobid}",)
 
 
     # Initialize our Trainer
