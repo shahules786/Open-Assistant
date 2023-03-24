@@ -45,7 +45,7 @@ class SamplingDataset(Dataset):
 
         self.dataset = []
         sampling_list = []
-        for data in dataset["prompts"][:4]:
+        for data in dataset["prompts"]:
             prompt = data["prompt"]
             for result in data["results"]:
                 sampling = result["sampling_config"]
