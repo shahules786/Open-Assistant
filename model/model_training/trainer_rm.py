@@ -30,16 +30,16 @@ from scipy.stats import kendalltau
 
 
 def compute_metrics(eval_pred):
-    logits = eval_pred.predictions.detach().cpu()
+    logits = eval_pred.predictions
     labels = eval_pred.label_ids
 
     pos_scores,neg_scores = [],[]
     for i in labels.unique():
         logits_batch = logits[labels==i]
-        pos_scores.append(logits_batch[0].item())
-        neg_scores.append(logits_batch[-1].item())
-    pos_scores = torch.tensor(pos_scores).view(-1,1)
-    neg_scores = torch.tensor(neg_scores).view(-1,1)
+        pos_scores.append(logits_batch[0])
+        neg_scores.append(logits_batch[-1])
+    pos_scores = np.array(pos_scores).reshape(-1,1)
+    neg_scores = np.array(neg_scores).reshape(-1,1)
 
     metrics = {
         "pos_score": np.mean(pos_scores),
@@ -52,7 +52,7 @@ def compute_metrics(eval_pred):
 
 def kendall_tau(eval_pred):
     
-    logits = eval_pred.predictions.detach().cpu()
+    logits = eval_pred.predictions
     labels = eval_pred.label_ids
     tau = 0.0
     for i in labels.unique():
