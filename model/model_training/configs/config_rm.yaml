@@ -67,7 +67,7 @@ oasst-rm-1-pythia-1b:
   datasets:
     - oasst_export:
         lang: "en,es,de,fr"
-        input_file_path: /home/shahul/oasst-model-eval/model_eval/manual/data/en_100_tree.jsonl
+        input_file_path: /home/ubuntu/oasst-model-eval/model_eval/manual/data/en_100_tree.jsonl
         val_split: 0.1
   model_name: EleutherAI/pythia-1b-deduped
   learning_rate: 2.3984085802847404e-05
