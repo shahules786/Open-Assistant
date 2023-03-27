@@ -56,7 +56,7 @@ def kendall_tau(eval_pred):
     labels = eval_pred.label_ids
     tau = 0.0
     for i in np.unique(labels):
-        logits_batch = logits[labels==i].numpy()
+        logits_batch = logits[labels==i]
         pred_rank = np.argsort(logits_batch)
         true_rank = np.arange(logits_batch.size-1,-1,-1)
         print(pred_rank,true_rank)
