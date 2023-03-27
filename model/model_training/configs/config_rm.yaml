@@ -69,7 +69,7 @@ oasst-rm-1-pythia-1b:
         lang: "en,es,de,fr"
         input_file_path: /home/ubuntu/oasst-model-eval/model_eval/manual/data/en_100_tree.jsonl
         val_split: 0.1
-  model_name: EleutherAI/pythia-1b-deduped
+  model_name: EleutherAI/gpt-neo-125M
   learning_rate: 2.3984085802847404e-05
   residual_dropout: 0.08172424407561013
   weight_decay: 0.07428722634825694
