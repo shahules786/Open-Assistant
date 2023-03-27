@@ -34,7 +34,7 @@ def compute_metrics(eval_pred):
     labels = eval_pred.label_ids
 
     pos_scores,neg_scores = [],[]
-    for i in labels.unique():
+    for i in np.unique(labels):
         logits_batch = logits[labels==i]
         pos_scores.append(logits_batch[0])
         neg_scores.append(logits_batch[-1])
@@ -55,14 +55,14 @@ def kendall_tau(eval_pred):
     logits = eval_pred.predictions
     labels = eval_pred.label_ids
     tau = 0.0
-    for i in labels.unique():
+    for i in np.unique(labels):
         logits_batch = logits[labels==i].numpy()
         pred_rank = np.argsort(logits_batch)
         true_rank = np.arange(logits_batch.size-1,-1,-1)
         print(pred_rank,true_rank)
         tau += kendalltau(pred_rank, true_rank)[0]
 
-    return tau/labels.unique().size(0)
+    return tau/np.unique(labels).size(0)
 
         
 
