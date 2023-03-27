@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Callable, Dict, List, Literal, Optional, Tuple, Union
 
-import bitsandbytes
+#import bitsandbytes
 import datasets
 import numpy as np
 import torch
@@ -26,11 +26,21 @@ from transformers.trainer_pt_utils import IterableDatasetShard
 from transformers.trainer_utils import seed_worker
 from transformers.training_args import OptimizerNames
 from transformers.utils import is_datasets_available
+from scipy.stats import kendalltau
 
 
 def compute_metrics(eval_pred):
-    scores = eval_pred.predictions
-    pos_scores, neg_scores = scores[:, 0], scores[:, 1]
+    logits = eval_pred.predictions.detach().cpu()
+    labels = eval_pred.label_ids
+
+    pos_scores,neg_scores = [],[]
+    for i in labels.unique():
+        logits_batch = logits[labels==i]
+        pos_scores.append(logits_batch[0].item())
+        neg_scores.append(logits_batch[-1].item())
+    pos_scores = torch.tensor(pos_scores).view(-1,1)
+    neg_scores = torch.tensor(neg_scores).view(-1,1)
+
     metrics = {
         "pos_score": np.mean(pos_scores),
         "neg_score": np.mean(neg_scores),
@@ -39,6 +49,22 @@ def compute_metrics(eval_pred):
     }
     return metrics
 
+
+def kendall_tau(eval_pred):
+    
+    logits = eval_pred.predictions.detach().cpu()
+    labels = eval_pred.label_ids
+    tau = 0.0
+    for i in labels.unique():
+        logits_batch = logits[labels==i].numpy()
+        pred_rank = np.argsort(logits_batch)
+        true_rank = np.arange(logits_batch.size-1,-1,-1)
+        print(pred_rank,true_rank)
+        tau += kendalltau(pred_rank, true_rank)[0]
+
+    return tau/labels.unique().size(0)
+
+        
 
 class RMTrainer(Trainer):
     def __init__(
@@ -82,19 +108,12 @@ class RMTrainer(Trainer):
 
         loss = loss.mean().detach()
 
-        pos_logits, neg_logits = [], []
-        for start, end in zip(cu_lens[:-1], cu_lens[1:]):
-            pos_logits.append(logits[start])
-            neg_logits.append(logits[end - 1])
-        pos_logits = torch.cat(pos_logits).detach()
-        neg_logits = torch.cat(neg_logits).detach()
+        labels=[]
+        for i, (s,e) in enumerate(zip(cu_lens[:-1], cu_lens[1:])):
+                labels.extend([i]*(e-s))
+        labels = torch.tensor(labels).view(-1,1)
 
-        out_logits = torch.stack([pos_logits, neg_logits], dim=1)  # shape (B, 2)
-        # need to pass something for `compute_metrics` to be called`,
-        # has to have the same size as logits, otherwise `_pad_across_processes` hangs
-        labels = torch.zeros_like(out_logits[:, 0])
-
-        return (loss, out_logits, labels)
+        return (loss, logits, labels)
 
     def get_train_dataloader(self):
         """
