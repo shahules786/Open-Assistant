@@ -62,7 +62,7 @@ def kendall_tau(eval_pred):
         print(pred_rank,true_rank)
         tau += kendalltau(pred_rank, true_rank)[0]
 
-    return {"kendall_tau":tau/np.unique(labels)}
+    return {"kendall_tau":tau/np.unique(labels).size}
 
         
 
