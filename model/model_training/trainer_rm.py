@@ -62,7 +62,7 @@ def kendall_tau(eval_pred):
         print(pred_rank,true_rank)
         tau += kendalltau(pred_rank, true_rank)[0]
 
-    return tau/np.unique(labels).size(0)
+    return {"kendall_tau":tau/np.unique(labels).size(0)}
 
         
 
@@ -318,7 +318,7 @@ def main():
         eval_dataset=evals,
         data_collator=eval_collate_fn,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=kendall_tau,
     )
     trainer.train()
     trainer.save_model()
