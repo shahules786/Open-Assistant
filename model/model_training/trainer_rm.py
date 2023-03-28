@@ -113,6 +113,11 @@ class RMTrainer(Trainer):
 
         if self.sampler is None:
             train_sampler = self._get_train_sampler()
+        else:
+            train_sampler = self.sampler
+            logging.warning("Custom sampler found!")
+
+        dataloader = DataLoader(
             train_dataset,
             batch_size=self._train_batch_size,
             sampler=train_sampler,
