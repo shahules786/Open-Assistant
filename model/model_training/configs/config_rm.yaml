@@ -129,6 +129,6 @@ oasst-rm-1-pythia-1b:
   score_l2_reg: 0.001
   eval_size:
   log_dir: "base"
-  metrics: ['accuracy','kendall_tau']
+  metrics: ['accuracy','kendalltau']
 
 
