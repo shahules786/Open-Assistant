@@ -283,7 +283,7 @@ def main():
         eval_dataset=evals,
         data_collator=eval_collate_fn,
         tokenizer=tokenizer,
-        compute_metrics=[compute_metrics,kendall_tau],
+        compute_metrics=compute_metrics,
     )
     trainer.train()
     trainer.save_model()
