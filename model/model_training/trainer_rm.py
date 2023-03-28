@@ -18,6 +18,7 @@ from model_training.utils import (
     get_tokenizer,
     read_yamls,
 )
+from model_training.metrics import RewardMetrics
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -28,43 +29,6 @@ from transformers.training_args import OptimizerNames
 from transformers.utils import is_datasets_available
 from scipy.stats import kendalltau
 
-
-def compute_metrics(eval_pred):
-    logits = eval_pred.predictions
-    labels = eval_pred.label_ids
-
-    pos_scores,neg_scores = [],[]
-    for i in np.unique(labels):
-        logits_batch = logits[labels==i]
-        pos_scores.append(logits_batch[0])
-        neg_scores.append(logits_batch[-1])
-    pos_scores = np.array(pos_scores).reshape(-1,1)
-    neg_scores = np.array(neg_scores).reshape(-1,1)
-
-    metrics = {
-        "pos_score": np.mean(pos_scores),
-        "neg_score": np.mean(neg_scores),
-        "score_diff": np.mean(pos_scores - neg_scores),
-        "accuracy": np.mean(pos_scores > neg_scores),
-    }
-    return metrics
-
-
-def kendall_tau(eval_pred):
-    
-    logits = eval_pred.predictions
-    labels = eval_pred.label_ids
-    tau = 0.0
-    for i in np.unique(labels):
-        logits_batch = logits[labels==i]
-        pred_rank = np.argsort(logits_batch)
-        true_rank = np.arange(logits_batch.size-1,-1,-1)
-        print(pred_rank,true_rank)
-        tau += kendalltau(pred_rank, true_rank)[0]
-
-    return {"kendall_tau":tau/np.unique(labels).size}
-
-        
 
 class RMTrainer(Trainer):
     def __init__(
@@ -113,7 +77,7 @@ class RMTrainer(Trainer):
                 labels.extend([i]*(e-s))
         labels = torch.tensor(labels).view(-1,1)
 
-        return (loss, logits, labels)
+        return (loss, out_logits, labels)
 
     def get_train_dataloader(self):
         """
@@ -149,11 +113,6 @@ class RMTrainer(Trainer):
 
         if self.sampler is None:
             train_sampler = self._get_train_sampler()
-        else:
-            train_sampler = self.sampler
-            logging.warning("Custom sampler found!")
-
-        dataloader = DataLoader(
             train_dataset,
             batch_size=self._train_batch_size,
             sampler=train_sampler,
@@ -307,6 +266,7 @@ def main():
             config=training_conf,
         )
 
+    compute_metrics = RewardMetrics(training_conf.metrics)
     trainer = RMTrainer(
         model=model,
         args=args,

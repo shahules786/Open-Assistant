@@ -1,5 +1,7 @@
 # Sections to train Reward Model (RM)
 
+!!! Code to train Reward Model moved to `models/model_training`
+
 Trainer code based on huggingface. Compatible with deepspeed or accelerate
 
 ## Requirements
