@@ -42,3 +42,6 @@ def main():
     dataset = dataset.add_column("history", similar_dict.values())
     dataset.push_to_hub("shahules786/dolphin-gpt4-chat")
     
+
+if __name__ == "__main__":
+    main()
