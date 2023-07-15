@@ -26,8 +26,8 @@ def batch_search(input_vectors, index,knn=3,batch_size=32, min_score=0.8):
 def main():
     
     model = load_vectorizer()
-    dataset = load_dataset("ehartford/dolphin",data_files="flan1m-alpaca-uncensored.jsonl")
-    dataset = dataset["train"].select(range(0,1000))
+    dataset = load_dataset("ehartford/dolphin",data_files="flan1m-alpaca-uncensored.jsonl")["train"]
+    # dataset = dataset["train"].select(range(0,1000))
     input_text = [item["input"].strip() for item in dataset]
     input_vectors = vectorize_text(model, input_text)
     
