@@ -103,8 +103,8 @@ def main(max_seq_len=8000, threshold=0.75):
     instructions = json.load(open("instructions.json"))["orca"]
     
     orca_df = pd.DataFrame()
-    for instr in tqdm(instructions[:2]):
-        subsample = dataset.filter(lambda example: example["instruction"]==instr).select(range(0,5000))
+    for instr in tqdm(instructions):
+        subsample = dataset.filter(lambda example: example["instruction"]==instr)
         dataset_samples = cluster_indices(subsample,model,tokenizer,max_seq_len,threshold)
         df = pd.DataFrame({"conversation":dataset_samples})
         df["source"] = "ehartford/dolphin"
