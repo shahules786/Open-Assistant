@@ -5,9 +5,10 @@ from tqdm import tqdm
 import argparse
 import json
 import pandas as pd
-
+import numpy as np
 
 SBERT_MODEL = "all-MiniLM-L6-v2"
+MAX_ROWS = 5
 
 def load_vectorizer(model=SBERT_MODEL):
      return SentenceTransformer(model)
@@ -32,15 +33,19 @@ def prepare_dataset(dataset, tokenizer, max_seq_len):
      samples = []
      current_sample_len = 0
      current_sample = []
+     num_of_samples = 0
      for idx,len_ in dataset_tokens_map.items():
-         if current_sample_len + len_ <= max_seq_len:
+         if (current_sample_len + len_ <= max_seq_len) and (num_of_samples < MAX_ROWS):
              current_sample.append({"input":inputs[idx],"output":outputs[idx]})
              current_sample_len += len_
+             num_of_samples+=1
          else:
+             num_of_samples = 0
              samples.append(current_sample)
              if len_ <= max_seq_len:
                  current_sample = [{"input":inputs[idx],"output":outputs[idx]}]
-                 current_sample_len += len_
+                 current_sample_len = len_
+                 num_of_samples += 1
 
      if len(current_sample) > 0:
          samples.append(current_sample)
@@ -70,6 +75,11 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
     for i in range(emmbeddings.shape[0]):
         if i not in removed_indices:
             _,_,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=threshold)
+            
+            ## add random samples for 5% data
+            if len(indices) < 2 and (np.random.uniform(0,1) < 0.05):
+                 _,_,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=0.3)
+                 
             if len(indices) > 1:
                 index.remove_ids(indices) 
                 removed_indices.extend(indices.tolist())
@@ -93,7 +103,7 @@ def main(max_seq_len=8000, threshold=0.75):
     instructions = json.load(open("instructions.json"))["orca"]
     
     orca_df = pd.DataFrame()
-    for instr in tqdm(instructions):
+    for instr in tqdm(instructions[:2]):
         subsample = dataset.filter(lambda example: example["instruction"]==instr).select(range(0,5000))
         dataset_samples = cluster_indices(subsample,model,tokenizer,max_seq_len,threshold)
         df = pd.DataFrame({"conversation":dataset_samples})
@@ -102,7 +112,7 @@ def main(max_seq_len=8000, threshold=0.75):
         orca_df = pd.concat([orca_df, df], ignore_index=True)
 
     with open("orca-chat-gpt4.json","w") as file:
-        json.dump(orca_df.to_dict(),file,indent=4)
+        json.dump(orca_df.to_dict("records"),file,indent=4)
         
 
     
