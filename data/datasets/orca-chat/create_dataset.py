@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 SBERT_MODEL = "all-MiniLM-L6-v2"
-MAX_ROWS = 5
+MAX_ROWS = 13
 
 def load_vectorizer(model=SBERT_MODEL):
      return SentenceTransformer(model)
@@ -74,8 +74,10 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
     removed_indices = []
     for i in range(emmbeddings.shape[0]):
         if i not in removed_indices:
-            _,_,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=threshold)
-            
+            _,D,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=threshold)
+            dup_indices = (D > 0.9).nonzero()[0].tolist()
+            if i in dup_indices:
+                dup_indices.remove(i)
             ## add random samples for 5% data
             if len(indices) < 2 and (np.random.uniform(0,1) < 0.05):
                  _,_,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=0.3)
@@ -83,6 +85,7 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
             if len(indices) > 1:
                 index.remove_ids(indices) 
                 removed_indices.extend(indices.tolist())
+                indices = [i for i in indices if i not in dup_indices]
                 samples = prepare_dataset(dataset.select(indices), tokenizer, max_seq_len)
                 dataset_samples.extend(samples)
 
