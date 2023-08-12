@@ -1,32 +1,36 @@
 from datasets import load_dataset
 import faiss
 from sentence_transformers import SentenceTransformer
+from FlagEmbedding import FlagModel
+from collections import Counter
 from tqdm import tqdm
 import argparse
 import json
 import pandas as pd
 import numpy as np
 
-SBERT_MODEL = "all-MiniLM-L6-v2"
-MAX_ROWS = 13
+SBERT_MODEL = "all-mpnet-base-v2"
+MAX_ROWS = 20
 
 def load_vectorizer(model=SBERT_MODEL):
-     return SentenceTransformer(model)
+     
+     return FlagModel('BAAI/bge-base-en', query_instruction_for_retrieval="Represent this sentence for searching relevant passages:")
+
+     #return SentenceTransformer(model)
     
 def vectorize_text(model,texts):
     
-    return model.encode(texts, show_progress_bar=True)
+    return model.encode(texts, batch_size=32)
 
 
-def prepare_dataset(dataset, tokenizer, max_seq_len):
+def prepare_dataset(dataset, max_seq_len):
      sys,inputs,outputs = [dataset[key] for key in ["instruction","input","output"]]
      sys = list(set(sys))
      assert len(sys) == 1, "expects single instruction type"
-     max_seq_len = max_seq_len - len(tokenizer.encode(sys[0])) - 4
+     max_seq_len = max_seq_len - (len(sys[0])//4) - 4
 
      model_inputs = [f"{inp} {out}" for inp,out in zip(inputs, outputs)]
-     model_inputs = tokenizer.batch_encode_plus(model_inputs, return_attention_mask=False)["input_ids"]
-     dataset_tokens_map = {i:len(tokens) for i,tokens in enumerate(model_inputs)}
+     dataset_tokens_map = {i:len(sent)//4 for i,sent in enumerate(model_inputs)}
      dataset_tokens_map = dict(
          sorted(dataset_tokens_map.items(), key=lambda item: item[1]))
 
@@ -52,16 +56,9 @@ def prepare_dataset(dataset, tokenizer, max_seq_len):
      return samples
     
 
-
-def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
+def create_faiss_index(emmbeddings):
     
-    
-    ## create embeddings
-    emmbeddings = vectorize_text(model, [item["input"].strip() for item in dataset])
-    
-    
-    dataset_samples = []
-    ## add indices
+      ## add indices
     d = emmbeddings.shape[-1]
     quantizer = faiss.IndexFlatIP(d)
     nlist = 100 if emmbeddings.shape[0] > 100 else 2
@@ -70,12 +67,23 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
     faiss.normalize_L2(emmbeddings)
     index.train(emmbeddings[:5000])
     index.add(emmbeddings)
+
+    return index 
+
+def cluster_indices(dataset, model, max_seq_len, threshold):
+    
+    
+    ## create embeddings
+    emmbeddings = vectorize_text(model, [item["input"].strip() for item in dataset])
+    
+    dataset_samples = []
+    index = create_faiss_index(emmbeddings)
     
     removed_indices = []
     for i in range(emmbeddings.shape[0]):
         if i not in removed_indices:
             _,D,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=threshold)
-            dup_indices = (D > 0.9).nonzero()[0].tolist()
+            dup_indices = indices[(D >= 0.9).nonzero()[0].tolist()].tolist()
             if i in dup_indices:
                 dup_indices.remove(i)
             ## add random samples for 5% data
@@ -85,8 +93,9 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
             if len(indices) > 1:
                 index.remove_ids(indices) 
                 removed_indices.extend(indices.tolist())
+                len_indices = len(indices)
                 indices = [i for i in indices if i not in dup_indices]
-                samples = prepare_dataset(dataset.select(indices), tokenizer, max_seq_len)
+                samples = prepare_dataset(dataset.select(indices), max_seq_len)
                 dataset_samples.extend(samples)
 
             else:
@@ -97,25 +106,71 @@ def cluster_indices(dataset, model, tokenizer, max_seq_len, threshold):
     return dataset_samples
 
 
+
+def cluster_similar(dataset, model,threshold):
+    
+    emmbeddings = vectorize_text(model, ["\n".join([item["input"]]) for item in dataset])
+    index = create_faiss_index(emmbeddings)
+    dataset_samples = []
+    removed_indices = []
+    for i in tqdm(range(emmbeddings.shape[0])):
+        if i not in removed_indices:
+            _,D,indices = index.range_search(emmbeddings[i].reshape(1,-1),thresh=threshold)
+            data_sample = {}
+            if len(indices) > 1:
+                index.remove_ids(indices) 
+                removed_indices.extend(indices.tolist())
+                data_sample["samples"] = [{"input":item["input"],"output":item["output"]} for item in dataset.select(indices)]
+
+            else:
+                samples = dataset.select([i])
+                sys,inputs,outputs = [samples[key] for key in ["instruction","input","output"]]
+                data_sample["samples"]  = [{"input":inputs[0],"output":outputs[0]}]
+            dataset_samples.append(data_sample)
+        
+    return dataset_samples
+
+
+def count_output_chars(examples):
+    response = examples['output'] 
+    lens = [len(r) for r in response]
+    
+    return {"output_len":lens}
+
+def update_json(df, filename):
+    
+    data = json.load(open(filename))
+    data.append(df.to_dict("records"))
+    with open(filename,'w') as file:
+        json.dump(data, file, indent=4)
+
 def main(max_seq_len=8000, threshold=0.75):
     
+    filename = "flan1m-cluster"
+    with open(filename,"w") as file:
+        json.dump([],file)
     model = load_vectorizer()
-    from transformers import LlamaTokenizer
-    tokenizer = LlamaTokenizer.from_pretrained("huggyllama/llama-7b")
     dataset = load_dataset("ehartford/dolphin",data_files="flan1m-alpaca-uncensored.jsonl")["train"]
-    instructions = json.load(open("instructions.json"))["orca"]
+    dataset = dataset.map(count_output_chars,batch_size=32,batched=True)
+    dataset = dataset.filter(lambda ex: ex['output_len']//4>100)
     
-    orca_df = pd.DataFrame()
-    for instr in tqdm(instructions):
+    instructions = [item["instruction"] for item in dataset]
+    instructions = list(dict(Counter(instructions).most_common()).keys())[::-1]
+    print("Number of instructions",len(instructions))
+    # orca_df = pd.DataFrame()
+    for instr in tqdm(instructions[3:]):
+        print(f"processing instruction {instr}")
         subsample = dataset.filter(lambda example: example["instruction"]==instr)
-        dataset_samples = cluster_indices(subsample,model,tokenizer,max_seq_len,threshold)
+        # dataset_samples = cluster_indices(subsample,model,max_seq_len,threshold)
+        dataset_samples = cluster_similar(subsample,model,threshold)
         df = pd.DataFrame({"conversation":dataset_samples})
         df["source"] = "ehartford/dolphin"
         df["instruction"] = instr
-        orca_df = pd.concat([orca_df, df], ignore_index=True)
+        update_json(df, filename)
+        # orca_df = pd.concat([orca_df, df], ignore_index=True)
 
-    with open("orca-chat-gpt4.json","w") as file:
-        json.dump(orca_df.to_dict("records"),file,indent=4)
+    # with open("orca-gpt4-dedup.json","w") as file:
+    #     json.dump(orca_df.to_dict("records"),file,indent=4)
         
 
     
