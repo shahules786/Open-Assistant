@@ -3,6 +3,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from text_generation import Client
 
     
 PROMPT =  """### User: Given a prompt and response
@@ -26,6 +27,11 @@ def infer(input_text, model, tokenizer, **kwargs):
      print(input_tokens['input_ids'].shape)
      output = model.generate(**input_tokens, **kwargs)
      output = tokenizer.decode(output.sequences[0])
+     
+
+def infer_client(prompt, **kwargs):
+    client = Client("http://127.0.0.1:8080")
+    return client.generate(prompt, **kwargs).generated_text
  
 if __name__ == "__main__":
     
