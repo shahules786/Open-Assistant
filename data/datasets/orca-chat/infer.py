@@ -1,11 +1,8 @@
 # Use a pipeline as a high-level helper
 from datasets import load_dataset
 from tqdm import tqdm
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import json
 
-from vllm import LLM, SamplingParams
-sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 
     
 PROMPT =  """### User: Given a prompt and response
@@ -26,11 +23,13 @@ PROMPT =  """### User: Given a prompt and response
 def infer(input_text, model, tokenizer, **kwargs):
      
      input_tokens = tokenizer(input_text, return_tensors="pt", truncation=True).to(model.device)
-     print(input_tokens['input_ids'].shape)
      output = model.generate(**input_tokens, **kwargs)
      output = tokenizer.decode(output.sequences[0])
      
 
+def infer_client(prompt, **kwargs):
+    client = Client("http://209.20.159.31:8080")
+    return client.generate(prompt, **kwargs).generated_text
  
 if __name__ == "__main__":
     
@@ -46,20 +45,20 @@ if __name__ == "__main__":
 
     }
     
-    sampling_params = SamplingParams(**model_args)
-
-    MODEL = "EleutherAI/gpt-neo-125m"
+    # MODEL = "EleutherAI/gpt-neo-125m"
     # tokenizer = AutoTokenizer.from_pretrained(MODEL, use_fast=False)
     # model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
-    model = llm = LLM(model=MODEL)
+    # model = llm = LLM(model=MODEL)
 
     outputs = []
     for item in tqdm(dataset):
         samples = item["conversation"]["samples"]
         instruction = item["instruction"]
         samples = [PROMPT.format(prompt=item["input"], response=item["output"]) for item in samples]
-        output = [llm.generate(prompt, sampling_params).outputs[0].text for prompt in samples]
+        output = [infer_client(item,**model_args) for item in samples]
         outputs.append(output)
         
-    dataset = dataset.add_column(MODEL.split("/")[-1], outputs)
-    dataset.to_json("orca-collection.json")
+    # dataset = dataset.add_column(MODEL.split("/")[-1], outputs)
+    # dataset.to_json("orca-collection.json")
+    with open("outputs.json","w") as file:
+        json.dump(outputs,file,indent=4)
