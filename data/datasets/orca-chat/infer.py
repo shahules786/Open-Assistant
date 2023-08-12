@@ -3,7 +3,9 @@ from datasets import load_dataset
 from tqdm import tqdm
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from text_generation import Client
+
+from vllm import LLM, SamplingParams
+sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
 
     
 PROMPT =  """### User: Given a prompt and response
@@ -29,9 +31,6 @@ def infer(input_text, model, tokenizer, **kwargs):
      output = tokenizer.decode(output.sequences[0])
      
 
-def infer_client(prompt, **kwargs):
-    client = Client("http://127.0.0.1:8080")
-    return client.generate(prompt, **kwargs).generated_text
  
 if __name__ == "__main__":
     
@@ -47,16 +46,19 @@ if __name__ == "__main__":
 
     }
     
+    sampling_params = SamplingParams(**model_args)
+
     MODEL = "EleutherAI/gpt-neo-125m"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL, use_fast=False)
-    model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
+    # tokenizer = AutoTokenizer.from_pretrained(MODEL, use_fast=False)
+    # model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=torch.float32, low_cpu_mem_usage=True, device_map="cpu")
+    model = llm = LLM(model=MODEL)
 
     outputs = []
     for item in tqdm(dataset):
         samples = item["conversation"]["samples"]
         instruction = item["instruction"]
         samples = [PROMPT.format(prompt=item["input"], response=item["output"]) for item in samples]
-        output = [infer(item,model,tokenizer,**model_args) for item in samples]
+        output = [llm.generate(prompt, sampling_params).outputs[0].text for prompt in samples]
         outputs.append(output)
         
     dataset = dataset.add_column(MODEL.split("/")[-1], outputs)
