@@ -12,11 +12,11 @@ PROMPT = """
 We would like you to evaluate and rate the difficulty and complexity of the following question. Label the question based on the level of difficulty as easy/medium/hard.
 Also generate appropriate tags for the given question.
 
-input : Instructions: In this task, you are given inputs i,j, and A, where i and j are integers and A is a list. You need to list all elements of A from the ith element to the jth element. i and j will be non-negative, and will always have a value less than the length of A. i will always be less than j.\nInput: 18, 28, ['e', '3481', '981', '8783', '9239', '5303', '3059', '6985', '129', '5915', 'M', '3953', '1053', '8777', 'C', '443', '3013', 'P', 'F', '7697', 'T', '9475', 'w', 'T', '141', '5493', '2631', '4553']
+question : In this task, you are given inputs i,j, and A, where i and j are integers and A is a list. You need to list all elements of A from the ith element to the jth element. i and j will be non-negative, and will always have a value less than the length of A. i will always be less than j.\nInput: 18, 28, ['e', '3481', '981', '8783', '9239', '5303', '3059', '6985', '129', '5915', 'M', '3953', '1053', '8777', 'C', '443', '3013', 'P', 'F', '7697', 'T', '9475', 'w', 'T', '141', '5493', '2631', '4553']
 1.Question Difficulty Level: Easy
 3.Tag Categories: Math, Programming Logic
 
-input:{inputs}
+question:{inputs}
 \n\n### Assistant:\n
 """
  
