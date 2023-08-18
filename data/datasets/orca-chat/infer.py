@@ -7,21 +7,16 @@ datasets.builder.has_sufficient_disk_space = lambda needed_bytes, directory='.':
 
     
 PROMPT = """
-### System:\nYou are Stable Beluga, an AI that follows instructions extremely well. Help as much as you can. Remember, be safe, and don't do anything illegal.\n\n
+### System:\nYou are an AI that follows instructions extremely well. I want you to act as an instructor.\n\n
 ### User
-Given a prompt and response
-1. Label the question based on the level of difficulty as easy/medium/hard.
-2. Check if the answer contains explanation as instructed. Give yes or no
-3. Tag based of question using categories.
+We would like you to evaluate and rate the difficulty and complexity of the following question. Label the question based on the level of difficulty as easy/medium/hard.
+Also generate appropriate tags for the given question.
 
 input : Instructions: In this task, you are given inputs i,j, and A, where i and j are integers and A is a list. You need to list all elements of A from the ith element to the jth element. i and j will be non-negative, and will always have a value less than the length of A. i will always be less than j.\nInput: 18, 28, ['e', '3481', '981', '8783', '9239', '5303', '3059', '6985', '129', '5915', 'M', '3953', '1053', '8777', 'C', '443', '3013', 'P', 'F', '7697', 'T', '9475', 'w', 'T', '141', '5493', '2631', '4553']
-output': ['F', '7697', 'T', '9475', 'w', 'T', '141', '5493', '2631', '4553'] \n\nHere's how I came up with this answer using the given definition:\n1. The value of i is 18, which means we start from the 18th element in the list A.\n2. The value of j is 28, which means we go up to the 28th element in the list A.\n3. I then looked at the list A to find the 18th to 28th elements (inclusive), which are ['F', '7697', 'T', '9475', 'w', 'T', '141', '5493', '2631', '4553']. 
 1.Question Difficulty Level: Easy
-2.Explanation in Answer: Yes
 3.Tag Categories: Math, Programming Logic
 
 input:{inputs}
-output:{output}
 \n\n### Assistant:\n
 """
  
@@ -57,8 +52,7 @@ def filter_dataset(dataset_name):
     outputs = []
     for item in tqdm(dataset):
         samples = item["conversation"]["samples"]
-        instruction = item["instruction"]
-        samples = [PROMPT.format(inputs=item["input"], output=item["output"]) for item in samples]
+        samples = [PROMPT.format(inputs=item["input"]) for item in samples]
         output = [infer_client(item,**model_args) for item in samples]
         outputs.append(output)
         
